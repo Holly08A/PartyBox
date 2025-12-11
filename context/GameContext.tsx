@@ -62,13 +62,20 @@ const gameReducer = (state: GameState, action: Action): GameState => {
 
     case 'ADD_CUSTOM_QUESTION': {
       const { game, categoryId, question } = action.payload;
-      const newState = { ...state };
+      const newState = { ...state, customQuestions: { ...state.customQuestions } };
+      
       if (game === 'bigTV' && categoryId) {
-        newState.customQuestions.bigTV[categoryId] = [...(newState.customQuestions.bigTV[categoryId] || []), question];
+        newState.customQuestions.bigTV = {
+          ...newState.customQuestions.bigTV,
+          [categoryId]: [...(newState.customQuestions.bigTV[categoryId] || []), question]
+        };
       } else if (game === 'bombQuestion') {
         newState.customQuestions.bombQuestion = [...newState.customQuestions.bombQuestion, question];
       } else if (game === 'wordChain' && categoryId) {
-        newState.customQuestions.wordChain[categoryId] = [...(newState.customQuestions.wordChain[categoryId] || []), question];
+        newState.customQuestions.wordChain = {
+          ...newState.customQuestions.wordChain,
+          [categoryId]: [...(newState.customQuestions.wordChain[categoryId] || []), question]
+        };
       } else if (game === 'forbidden') {
         newState.customQuestions.forbidden = [...newState.customQuestions.forbidden, question];
       }
@@ -77,13 +84,20 @@ const gameReducer = (state: GameState, action: Action): GameState => {
 
     case 'DELETE_CUSTOM_QUESTION': {
       const { game, categoryId, id } = action.payload;
-      const newState = { ...state };
+      const newState = { ...state, customQuestions: { ...state.customQuestions } };
+      
       if (game === 'bigTV' && categoryId) {
-        newState.customQuestions.bigTV[categoryId] = newState.customQuestions.bigTV[categoryId].filter(q => q.id !== id);
+        newState.customQuestions.bigTV = {
+          ...newState.customQuestions.bigTV,
+          [categoryId]: newState.customQuestions.bigTV[categoryId]?.filter(q => q.id !== id) || []
+        };
       } else if (game === 'bombQuestion') {
         newState.customQuestions.bombQuestion = newState.customQuestions.bombQuestion.filter(q => q.id !== id);
       } else if (game === 'wordChain' && categoryId) {
-        newState.customQuestions.wordChain[categoryId] = newState.customQuestions.wordChain[categoryId].filter(q => q.id !== id);
+        newState.customQuestions.wordChain = {
+          ...newState.customQuestions.wordChain,
+          [categoryId]: newState.customQuestions.wordChain[categoryId]?.filter(q => q.id !== id) || []
+        };
       } else if (game === 'forbidden') {
         newState.customQuestions.forbidden = newState.customQuestions.forbidden.filter(q => q.id !== id);
       }
@@ -96,7 +110,6 @@ const gameReducer = (state: GameState, action: Action): GameState => {
       
       if (game === 'bigTV' && categoryId) {
         const current = newState.playedHistory.bigTV[categoryId] || [];
-        // Add only unique new IDs
         const newSet = new Set([...current, ...ids]);
         newState.playedHistory.bigTV = {
           ...newState.playedHistory.bigTV,
@@ -123,22 +136,35 @@ const gameReducer = (state: GameState, action: Action): GameState => {
 
     case 'RESET_HISTORY': {
       const { game, categoryId } = action.payload;
-      const newState = { ...state, playedHistory: { ...state.playedHistory } };
+      
+      // Explicitly shallow copy all nested history objects to ensure reference changes
+      const newPlayedHistory = {
+        bigTV: { ...state.playedHistory.bigTV },
+        bombQuestion: [...state.playedHistory.bombQuestion],
+        wordChain: { ...state.playedHistory.wordChain },
+        forbidden: [...state.playedHistory.forbidden],
+      };
 
       if (game === 'bigTV' && categoryId) {
-        newState.playedHistory.bigTV = { ...newState.playedHistory.bigTV, [categoryId]: [] };
+        newPlayedHistory.bigTV[categoryId] = [];
       } else if (game === 'bombQuestion') {
-        newState.playedHistory.bombQuestion = [];
+        newPlayedHistory.bombQuestion = [];
       } else if (game === 'wordChain' && categoryId) {
-         newState.playedHistory.wordChain = { ...newState.playedHistory.wordChain, [categoryId]: [] };
+        newPlayedHistory.wordChain[categoryId] = [];
+        // Ensure the object key reference update is propagated if wordChain was structured that way, 
+        // though `newPlayedHistory.wordChain` is already a new object.
       } else if (game === 'forbidden') {
-        newState.playedHistory.forbidden = [];
+        newPlayedHistory.forbidden = [];
       }
-      return newState;
+
+      return {
+        ...state,
+        playedHistory: newPlayedHistory,
+      };
     }
 
     case 'UPDATE_SETTINGS':
-      return state;
+      return { ...state, settings: { ...state.settings, ...action.payload } };
 
     default:
       return state;
@@ -155,7 +181,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const storedCustom = localStorage.getItem(STORAGE_KEY_CUSTOM);
       if (storedCustom) {
-        loadedState.customQuestions = JSON.parse(storedCustom);
+        const parsed = JSON.parse(storedCustom);
+        // Robust merge for custom questions
+        loadedState.customQuestions = {
+          bigTV: { ...initial.customQuestions.bigTV, ...(parsed.bigTV || {}) },
+          bombQuestion: parsed.bombQuestion || initial.customQuestions.bombQuestion,
+          wordChain: { ...initial.customQuestions.wordChain, ...(parsed.wordChain || {}) },
+          forbidden: parsed.forbidden || initial.customQuestions.forbidden,
+        };
       }
     } catch (e) {
       console.error("Failed to load custom questions", e);
@@ -165,7 +198,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const storedHistory = localStorage.getItem(STORAGE_KEY_HISTORY);
       if (storedHistory) {
-        loadedState.playedHistory = JSON.parse(storedHistory);
+        const parsed = JSON.parse(storedHistory);
+        // Robust merge for history
+        loadedState.playedHistory = {
+          bigTV: { ...initial.playedHistory.bigTV, ...(parsed.bigTV || {}) },
+          bombQuestion: Array.isArray(parsed.bombQuestion) ? parsed.bombQuestion : initial.playedHistory.bombQuestion,
+          wordChain: { ...initial.playedHistory.wordChain, ...(parsed.wordChain || {}) },
+          forbidden: Array.isArray(parsed.forbidden) ? parsed.forbidden : initial.playedHistory.forbidden,
+        };
       }
     } catch (e) {
       console.error("Failed to load history", e);

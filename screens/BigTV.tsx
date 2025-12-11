@@ -108,10 +108,10 @@ export const BigTVSetup: React.FC = () => {
                   {stats.played > 0 && (
                     <button 
                       onClick={(e) => handleResetHistory(e, cat.id)}
-                      className={`absolute bottom-3 right-3 p-1.5 rounded-full hover:bg-black/10 z-10 ${settings.bigTV.selectedCategoryId === cat.id ? 'text-black/60' : 'text-gray-400'}`}
+                      className={`absolute bottom-2 right-2 p-3 rounded-full hover:bg-white/20 z-10 transition-colors ${settings.bigTV.selectedCategoryId === cat.id ? 'text-black/80' : 'text-gray-300'}`}
                       title="重置題目"
                     >
-                      <RefreshCw size={14} />
+                      <RefreshCw size={16} strokeWidth={2.5} />
                     </button>
                   )}
 
@@ -204,15 +204,24 @@ export const BigTVPlay: React.FC = () => {
        });
     }
 
+    // Prepare new score stats
+    const newScore = correct ? sessionData.score + 1 : sessionData.score;
+    const newPass = correct ? sessionData.pass : sessionData.pass + 1;
+
     // Get next
     // Note: sessionData.questionsPlayed tracks *this session*. 
     // deck is already filtered for *previous sessions*.
-    // We need to filter deck against *current session* usage too.
     const usedInSession = new Set(sessionData.questionsPlayed);
     const available = deck.filter(q => !usedInSession.has(q.id));
     
     if (available.length === 0) {
+      // Record the result of the last question before ending
+      dispatch({ 
+        type: 'UPDATE_SESSION', 
+        payload: { score: newScore, pass: newPass } 
+      });
       setIsPlaying(false);
+      // Game finished early!
       dispatch({ type: 'NAVIGATE', payload: 'bigTVResult' });
       return;
     }
@@ -222,8 +231,8 @@ export const BigTVPlay: React.FC = () => {
     dispatch({ 
       type: 'UPDATE_SESSION', 
       payload: { 
-        score: correct ? sessionData.score + 1 : sessionData.score,
-        pass: correct ? sessionData.pass : sessionData.pass + 1,
+        score: newScore,
+        pass: newPass,
         questionsPlayed: [...sessionData.questionsPlayed, nextQ.id],
         currentQuestion: nextQ
       } 
@@ -310,20 +319,30 @@ export const BigTVPlay: React.FC = () => {
 
 export const BigTVResult: React.FC = () => {
   const { state, dispatch } = useGame();
+  const { timeLeft, score, pass } = state.sessionData;
+  const { duration } = state.settings.bigTV;
+  
+  const isFinished = timeLeft > 0;
+  const timeUsed = duration - timeLeft;
   
   return (
     <ScreenLayout noPadding onHome={() => dispatch({ type: 'NAVIGATE', payload: 'home' })}>
       <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-transparent to-black/40">
-        <h2 className="text-3xl font-bold text-white mb-8">時間到！</h2>
+        <h2 className="text-3xl font-bold text-white mb-2">{isFinished ? '完成所有題目！' : '時間到！'}</h2>
+        
+        {isFinished && (
+           <p className="text-xl text-primary font-bold mb-8">用時: {timeUsed} 秒</p>
+        )}
+        {!isFinished && <div className="mb-8" />}
         
         <div className="grid grid-cols-2 gap-8 w-full max-w-xs mb-12">
            <div className="bg-black/30 p-6 rounded-2xl">
              <div className="text-text-sub text-sm mb-1">答對</div>
-             <div className="text-5xl font-bold text-success">{state.sessionData.score}</div>
+             <div className="text-5xl font-bold text-success">{score}</div>
            </div>
            <div className="bg-black/30 p-6 rounded-2xl">
              <div className="text-text-sub text-sm mb-1">跳過</div>
-             <div className="text-5xl font-bold text-text-sub">{state.sessionData.pass}</div>
+             <div className="text-5xl font-bold text-text-sub">{pass}</div>
            </div>
         </div>
 
