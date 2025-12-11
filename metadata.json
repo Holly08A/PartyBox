@@ -1,0 +1,5 @@
+{
+  "name": "PartyBox",
+  "description": "A mobile-first party game toolbox featuring BigTV, Bomb Squad, and Word Chain games with custom question support.",
+  "requestFramePermissions": []
+}
